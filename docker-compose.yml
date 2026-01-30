@@ -1,0 +1,10 @@
+services:
+  imessage-mcp:
+    build: .
+    volumes:
+      # Mount the iMessage database from host
+      # User must grant Full Disk Access to Docker Desktop
+      - ${HOME}/Library/Messages/chat.db:/data/chat.db:ro
+    environment:
+      - CHAT_DB_PATH=/data/chat.db
+    restart: always
