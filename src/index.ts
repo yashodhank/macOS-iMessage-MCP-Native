@@ -9,18 +9,20 @@ import {
 } from "@modelcontextprotocol/sdk/types.js";
 import { MessageDatabase } from "./db.js";
 import { AppleScriptService } from "./applescript.js";
+import { performHealthCheck, formatHealthCheckResult, checkFullDiskAccess } from "./permissions.js";
 import { z } from "zod";
 
 class IMessageServer {
   private server: Server;
-  private db: MessageDatabase;
+  private db: MessageDatabase | null = null;
   private appleScript: AppleScriptService;
+  private dbInitError: string | null = null;
 
   constructor() {
     this.server = new Server(
       {
         name: "imessage-mcp",
-        version: "1.0.0",
+        version: "1.1.0",
       },
       {
         capabilities: {
@@ -29,7 +31,15 @@ class IMessageServer {
       }
     );
 
-    this.db = new MessageDatabase();
+    // Try to initialize database, but don't fail if permissions are missing
+    try {
+      this.db = new MessageDatabase();
+    } catch (error: any) {
+      this.dbInitError = error.message || 'Failed to initialize database';
+      console.error("[Warning] Database initialization failed:", this.dbInitError);
+      console.error("[Warning] Read operations will be unavailable. Run health_check for details.");
+    }
+    
     this.appleScript = new AppleScriptService();
 
     this.setupToolHandlers();
@@ -123,6 +133,14 @@ class IMessageServer {
             properties: {},
           },
         },
+        {
+          name: "health_check",
+          description: "Check the health status of the MCP server including permissions and system requirements",
+          inputSchema: {
+            type: "object",
+            properties: {},
+          },
+        },
       ],
     }));
 
@@ -137,18 +155,39 @@ class IMessageServer {
               })
               .parse(request.params.arguments);
 
-            await this.appleScript.sendMessage(recipient, message);
-            return {
-              content: [
-                {
-                  type: "text",
-                  text: `Successfully sent message to ${recipient}`,
-                },
-              ],
-            };
+            const result = await this.appleScript.sendMessage(recipient, message);
+            
+            if (result.success) {
+              return {
+                content: [
+                  {
+                    type: "text",
+                    text: `Successfully sent message to ${recipient}`,
+                  },
+                ],
+              };
+            } else {
+              return {
+                content: [
+                  {
+                    type: "text",
+                    text: JSON.stringify({
+                      success: false,
+                      error: result.error,
+                      errorCode: result.errorCode,
+                      recommendation: result.recommendation,
+                    }, null, 2),
+                  },
+                ],
+                isError: true,
+              };
+            }
           }
 
           case "get_recent_messages": {
+            if (!this.db) {
+              return this.dbUnavailableResponse();
+            }
             const { limit } = z
               .object({
                 limit: z.number().optional().default(20),
@@ -167,6 +206,9 @@ class IMessageServer {
           }
 
           case "search_messages": {
+            if (!this.db) {
+              return this.dbUnavailableResponse();
+            }
             const { query, limit } = z
               .object({
                 query: z.string(),
@@ -186,6 +228,9 @@ class IMessageServer {
           }
 
           case "get_contact_messages": {
+            if (!this.db) {
+              return this.dbUnavailableResponse();
+            }
             const { handle, limit } = z
               .object({
                 handle: z.string(),
@@ -205,12 +250,27 @@ class IMessageServer {
           }
 
           case "list_chats": {
+            if (!this.db) {
+              return this.dbUnavailableResponse();
+            }
             const chats = this.db.listChats();
             return {
               content: [
                 {
                   type: "text",
                   text: JSON.stringify(chats, null, 2),
+                },
+              ],
+            };
+          }
+
+          case "health_check": {
+            const healthResult = await performHealthCheck();
+            return {
+              content: [
+                {
+                  type: "text",
+                  text: formatHealthCheckResult(healthResult),
                 },
               ],
             };
@@ -234,8 +294,26 @@ class IMessageServer {
     });
   }
 
+  private dbUnavailableResponse() {
+    return {
+      content: [
+        {
+          type: "text" as const,
+          text: JSON.stringify({
+            error: "Database unavailable",
+            reason: this.dbInitError || "Full Disk Access permission required",
+            recommendation: "Run the health_check tool to diagnose and fix permission issues.",
+          }, null, 2),
+        },
+      ],
+      isError: true,
+    };
+  }
+
   async cleanup() {
-    this.db.close();
+    if (this.db) {
+      this.db.close();
+    }
   }
 
   async run() {
