@@ -11,6 +11,15 @@ A Model Context Protocol (MCP) server for interacting with macOS iMessages. This
 - **Contact Integration**: Find chats by contact name or handle.
 - **TOON Format**: Upgraded output using Token-Oriented Object Notation for token efficiency.
 
+## 📖 Documentation
+
+For detailed guides, please refer to the following:
+- **[User's Manual](./USERS_MANUAL.md)**: High-level usage guide.
+- **[Getting Started](./docs/GETTING_STARTED.md)**: Detailed setup and installation.
+- **[Architecture & Design](./docs/ARCHITECTURE.md)**: Technical deep dive.
+- **[API Reference](./docs/API_REFERENCE.md)**: Full list of tools and resources.
+- **[Troubleshooting](./docs/TROUBLESHOOTING.md)**: Common issues and fixes.
+
 ## TOON Format Output
 
 This server has been upgraded to use the **TOON (Token-Oriented Object Notation) v3.0** format for all tool outputs and resources. This format is designed for maximum token efficiency in Large Language Model (LLM) communications, reducing token overhead by up to 50% compared to standard JSON.
