@@ -59,6 +59,58 @@ npm run build
 npm start
 ```
 
+## 🚀 Use Cases & Examples
+
+The iMessages MCP Server turns your iMessage history into a powerful knowledge base for AI. Here are some ways to use it:
+
+### 1. Automated Summaries
+Ask your AI: *"Summarize the last 10 messages from my mom."* or *"What was the outcome of the group discussion about the weekend trip?"*
+
+### 2. Personal Assistant
+*   *"Draft a reply to David's last message about the project update."*
+*   *"Search for the address Sarah sent me last Tuesday."*
+*   *"Remind me what I told Mike I would do today."*
+
+### 3. Notification & Alerting (via scripts)
+Integrate the MCP tools into automated workflows to notify you of specific keywords or summarize your day's conversations every evening.
+
+### 4. Searchable Archive
+*   *"Find all mentions of 'Bitcoin' in my chat history."*
+*   *"Show me all photos/attachments sent by John in the last month."* (Using `get_attachment_path`)
+
+---
+
+## 🛠 Configuration Guide
+
+### 1. Environment Variables
+You can customize the server behavior using environment variables:
+
+| Variable | Description | Default |
+| :--- | :--- | :--- |
+| `CHAT_DB_PATH` | Full path to the iMessage `chat.db` file. | `~/Library/Messages/chat.db` |
+| `DEBUG` | Enable verbose logging for troubleshooting. | `false` |
+
+### 2. Connecting to MCP Clients
+
+#### Claude Desktop
+Add the following to your `claude_desktop_config.json`:
+
+```json
+{
+  "mcpServers": {
+    "imessage": {
+      "command": "/path/to/node",
+      "args": ["/path/to/imessage-mcp/dist/index.js"]
+    }
+  }
+}
+```
+
+#### Cursor / VS Code
+If using an MCP extension, point the command to your `node` executable and the arguments to the `index.js` path.
+
+---
+
 ## Permissions Requirements
 
 This server requires two main permissions on macOS:
@@ -84,6 +136,7 @@ The binary build uses `pkg` which may sometimes have issues with native modules 
 ## Configuration
 
 - `CHAT_DB_PATH`: (Optional) Custom path to `chat.db`. Defaults to the standard macOS path.
+- `DEBUG`: (Optional) Set to `true` to see raw SQL queries and AppleScript logs.
 
 ## Development
 

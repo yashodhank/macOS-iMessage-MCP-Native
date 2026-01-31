@@ -53,3 +53,40 @@ npm run dev
 ## Health Check
 
 Once running, you can verify your setup using the `health_check` tool within your MCP client. It will diagnose any missing permissions or environment issues.
+
+## Detailed Configuration Guide
+
+### 1. Finding your Node.js path
+MCP clients usually need the absolute path to the `node` executable.
+```bash
+which node
+# Output: /usr/local/bin/node (Example)
+```
+
+### 2. Setting up with Claude Desktop
+Claude Desktop looks for a configuration file at `~/Library/Application Support/Claude/claude_desktop_config.json`.
+
+**Recommended Configuration:**
+```json
+{
+  "mcpServers": {
+    "imessage": {
+      "command": "/usr/local/bin/node",
+      "args": ["/Users/YOUR_USER/path/to/imessage-mcp/dist/index.js"],
+      "env": {
+        "CHAT_DB_PATH": "/Users/YOUR_USER/Library/Messages/chat.db"
+      }
+    }
+  }
+}
+```
+
+### 3. Permission Deep-Dive
+If `health_check` reports issues even after granting permissions:
+- **Terminal Integration**: Ensure the terminal you used to build/test the server has FDA.
+- **IDE Sandboxing**: Some IDEs (like Cursor) run in a sandbox that may not inherit FDA from the terminal. You must explicitly add the IDE application to the FDA list.
+- **Full Disk Access (FDA)**: This is the most common failure point. Mac security requires that the *parent process* (the app that launches the server) has FDA.
+
+## Next Steps
+- Read the [User's Manual](../USERS_MANUAL.md) for practical examples.
+- Explore the [API Reference](./API_REFERENCE.md) for a list of all available tools.

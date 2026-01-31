@@ -21,16 +21,42 @@ If you haven't installed the server yet, follow our [Getting Started Guide](./do
 **Pro Tip**: Always ensure you have granted **Full Disk Access** to the terminal or app running this server.
 
 ## 3. Using the Tools
-The server exposes several tools to your AI agent:
-- **`send_message`**: Ask the AI to "Send a message to John saying Hello".
-- **`get_recent_messages`**: Ask "What are my latest messages?".
-- **`search_messages`**: Ask "Find all messages about the dinner party".
-- **`list_chats`**: Ask "Who have I been talking to lately?".
+The server exposes several tools to your AI agent. Here is how you can interact with them:
 
-- [Detailed API Reference](./docs/API_REFERENCE.md)
-- [Feature Walkthrough](./docs/FEATURES.md)
+### ✉️ Sending Messages
+**Tool**: `send_message`
+- **Example**: *"Send a message to +1234567890 saying 'I'll be there in 5 minutes!'"*
+- **What happens**: The AI calls the tool, which executes an AppleScript to send the message. You'll see the message appear in your Messages app.
 
-## 4. TOON Format
+### 🔍 Searching History
+**Tool**: `search_messages`
+- **Example**: *"Find any messages where I discussed 'flight tickets'."*
+- **What happens**: The server queries your local `chat.db` and returns a list of matching messages in efficient TOON format.
+
+### 🕒 Reading Recent Conversations
+**Tool**: `get_recent_messages`
+- **Example**: *"What are my 5 most recent messages?"*
+- **What happens**: Returns the latest messages across all your chats, including who sent them and when.
+
+### 📁 Accessing Attachments
+**Tool**: `get_attachment_path`
+- **Example**: *"Find the file path for the last photo John sent me."* (The AI will first find the message, get the attachment GUID, then call this tool).
+- **What happens**: Resolves the GUID to a local path like `/Users/YOU/Library/Messages/Attachments/...`.
+
+---
+
+## 4. Practical Usage Scenarios
+
+| Scenario | AI Prompt | Recommended Tool |
+| :--- | :--- | :--- |
+| **Recapping** | "What did Mike say about the meeting earlier today?" | `get_contact_messages` |
+| **Planning** | "Find all messages from last week about 'vacation' and summarize our ideas." | `search_messages` |
+| **Coordinating** | "Message my wife that I'm leaving work now." | `send_message` |
+| **Maintenance** | "Check if my permissions are set up correctly." | `health_check` |
+
+---
+
+## 5. Understanding TOON Format
 This server uses the **TOON v3.0** format for efficiency. Your AI agent will receive data in a compact, tabular style that saves tokens and increases speed. No configuration is needed; it's handled automatically.
 
 ## 5. Diagnostics & Troubleshooting
