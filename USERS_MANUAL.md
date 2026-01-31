@@ -43,4 +43,9 @@ If you encounter errors like `Database unavailable` or `Error -1743`, run the **
 - **Get Involved**: Check out [CONTRIBUTORS.md](./CONTRIBUTORS.md)
 
 ---
-*For technical details, see the [Architecture Document](./docs/ARCHITECTURE.md).*
+*Technical Deep Dives*:
+- [MCP Protocol Implementation](./docs/MCP_PROTOCOL.md)
+- [Database & SQLite Internals](./docs/DATABASE_LAYER.md)
+- [AppleScript Messaging Logic](./docs/APPLESCRIPT_INTEGRATION.md)
+- [Binary & Docker Deployment](./docs/CONFIGURATION_DEPLOYMENT.md)
+- [System Architecture](./docs/ARCHITECTURE.md)

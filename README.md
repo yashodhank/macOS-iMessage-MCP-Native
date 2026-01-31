@@ -17,6 +17,10 @@ For detailed guides, please refer to the following:
 - **[User's Manual](./USERS_MANUAL.md)**: High-level usage guide.
 - **[Getting Started](./docs/GETTING_STARTED.md)**: Detailed setup and installation.
 - **[Architecture & Design](./docs/ARCHITECTURE.md)**: Technical deep dive.
+- **[MCP Protocol](./docs/MCP_PROTOCOL.md)**: MCP implementation details.
+- **[Database Layer](./docs/DATABASE_LAYER.md)**: SQLite and chat.db internals.
+- **[AppleScript Integration](./docs/APPLESCRIPT_INTEGRATION.md)**: Native messaging logic.
+- **[Deployment](./docs/CONFIGURATION_DEPLOYMENT.md)**: Binary and Docker guides.
 - **[API Reference](./docs/API_REFERENCE.md)**: Full list of tools and resources.
 - **[Troubleshooting](./docs/TROUBLESHOOTING.md)**: Common issues and fixes.
 
