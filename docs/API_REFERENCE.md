@@ -2,63 +2,72 @@
 
 This document details the tools and resources exposed by the iMessages MCP Server.
 
-## Tools
+## Detailed Tool Specifications
 
 ### `send_message`
-Sends an iMessage or SMS.
-- **Arguments**:
-  - `recipient` (string): Phone number or email.
-  - `message` (string): Text content.
+Sends an iMessage or SMS using the native Messages app.
+- **Input Parameters**:
+  - `recipient` (string): Phone number (international format) or email address.
+  - `message` (string): The text content to send.
+- **Returns**: A success confirmation or a detailed error with recommendations (e.g., TCC permission tips).
 
 ### `get_recent_messages`
-Retrieves recent messages from the database.
-- **Arguments**:
-  - `limit` (number, default: 20): Number of messages to fetch.
+Retrieves a flat timeline of the most recent messages across all threads.
+- **Input Parameters**:
+  - `limit` (number, default: 20): Maximum number of messages to return.
+- **Returns**: A TOON-formatted list of message objects.
 
 ### `search_messages`
-Searches message text for a query.
-- **Arguments**:
-  - `query` (string): Text to search for.
-  - `limit` (number, default: 20): Maximum results.
+Performs a full-text search across the entire message database.
+- **Input Parameters**:
+  - `query` (string): The text search term.
+  - `limit` (number, default: 20): Maximum number of matching messages.
+- **Returns**: A TOON-formatted list of matching message objects.
 
 ### `get_contact_messages`
-Gets history with a specific contact.
-- **Arguments**:
-  - `handle` (string): Recipient identifier.
-  - `limit` (number, default: 20): Maximum results.
+Retrieves the conversation history for a specific recipient.
+- **Input Parameters**:
+  - `handle` (string): The phone number or email of the contact.
+  - `limit` (number, default: 20): Maximum history length.
+- **Returns**: A TOON-formatted list of messages, ordered chronologically.
 
 ### `list_chats`
-Lists all active chat conversations.
+Enumerates all active chat sessions on the device.
+- **Returns**: A list of chat objects including `chat_id`, `display_name`, and `last_message_date`.
 
 ### `search_contacts`
-Searches for contact handles.
-- **Arguments**:
-  - `query` (string): Partial name or number.
+Finds recipient handles based on partial matches.
+- **Input Parameters**:
+  - `query` (string): Partial name, number, or email.
+- **Returns**: A list of matching contact handles from the iMessage database.
 
 ### `get_attachment_path`
-Gets the local path for an attachment.
-- **Arguments**:
-  - `guid` (string): The attachment GUID.
+Resolves an attachment identifier to a physical file path.
+- **Input Parameters**:
+  - `guid` (string): The attachment GUID found in message metadata.
+- **Returns**: The absolute file path on the local disk.
 
 ### `health_check`
-Diagnoses permissions and system status.
+Performs a self-diagnostic of the server environment.
+- **Returns**: Status of Full Disk Access, Automation permissions, and database connectivity.
 
-## Resources
+## Resource Specifications
 
 ### `imessage://recent`
-A dynamic resource providing a real-time JSON stream of the 50 most recent messages.
-- **MimeType**: `text/toon; charset=utf-8`
+- **Description**: Provides a real-time read of the 50 most recent messages.
+- **Protocol**: Returns the data in **TOON v3.0** syntax.
 
-## Data Interfaces
+## Data Interface Definitions
 
-### Message Object (TOON)
-```toon
-guid:string
-text:string
-sender:string
-date:ISO-String
-is_from_me:boolean
-reply_to_guid:string?
-is_read:boolean
-service:string (iMessage/SMS)
-```
+### Message Object Fields
+
+| Field | Type | Description |
+| :--- | :--- | :--- |
+| `guid` | string | Unique identifier for the message. |
+| `text` | string | Content of the message. |
+| `sender` | string | Handle of the sender. |
+| `date` | string | ISO-8601 timestamp. |
+| `is_from_me` | boolean | `true` if outgoing, `false` if incoming. |
+| `reply_to_guid` | string? | GUID of the parent message in a thread. |
+| `is_read` | boolean | Read status of the message. |
+| `service` | string | `iMessage` or `SMS`. |

@@ -4,45 +4,43 @@ The iMessages MCP Server is built with a modular, service-oriented architecture 
 
 ## System Architecture
 
-The server consists of several core layers:
+The server consists of five core layers, each with a specific responsibility:
 
-1. **MCP Transport Layer**: Handles communication with the MCP client (e.g., Claude Desktop) via Standard Input/Output (stdio).
-2. **Service Layer**: Orchestrates logic between the MCP protocol and macOS-specific operations.
-3. **Database Abstraction Layer (`db.ts`)**: Provides read-only access to the SQLite `chat.db`. It handles complex joins for attachments and thread resolution.
-4. **AppleScript Engine (`applescript.ts`)**: Manages inter-process communication with the native Messages.app for sending content.
-5. **Permissions Guardian (`permissions.ts`)**: Performs empirical tests to verify TCC permission status and system health.
+1.  **Transport Layer (stdio)**: Uses JSON-RPC 2.0 over standard I/O to communicate with the MCP client. This layer is handled by the `@modelcontextprotocol/sdk`.
+2.  **Server Logic Layer (`index.ts`)**: Orchestrates the server lifecycle, registers tools and resources, and maps incoming requests to service calls.
+3.  **Messaging Provider Layer (`providers/`)**: A modular backend for sending messages. It uses a **Fallback Strategy** to prioritize performance (Native) while maintaining reliability (AppleScript).
+4.  **Database Layer (`db.ts`)**: Provides a high-performance, read-only interface to the macOS `chat.db` using `better-sqlite3`.
+5.  **Diagnostics Layer (`permissions.ts`)**: Performs non-invasive empirical tests to verify TCC (Transparency, Consent, and Control) permissions.
 
 ## Key Design Patterns
 
-- **Read-Only Database**: The server opens `chat.db` in `immutable` / `query_only` mode to prevent database corruption and minimize locking conflicts with the Messages app.
-- **Exponential Backoff**: Implements a synchronous retry mechanism for database locks, ensuring stability when the Messages app is actively writing.
-- **Normalization**: Automatically cleans and formats phone numbers and identifiers before processing, reducing delivery failures.
-- **Token Efficiency**: Custom TOON encoder serializes data into a tabular format, significantly reducing the token footprint for AI agents.
+### 1. The Provider Pattern (Messaging)
+To decouple the tool logic from the complexities of macOS IPC, the server implements a `MessagingProvider` interface. 
+- **`FallbackProvider`**: The primary orchestrator. It executes providers in a prioritized sequence.
+- **`AppleScriptProvider`**: Implements **Exponential Backoff** (3 retries: 1s, 2s, 4s) and **Self-Healing** (auto-detects if Messages.app is running and re-launches it if necessary).
+- **`NativeProvider`**: A future-proof hook for high-performance IMCore integration.
 
-## Messaging Architecture: The Provider Pattern
+### 2. Read-Only Database (Pragmas & Safety)
+The database is accessed with strict safety measures:
+- `immutable=1` and `query_only=1` to prevent any writes.
+- `journal_mode=WAL` support to allow reading while Messages.app is writing.
+- `synchronous=OFF` for maximum read performance during high-volume queries.
 
-To ensure reliability across different macOS security environments, the server implements a **Provider Pattern** for message delivery. This decouples the MCP tool logic from the specific implementation details of sending a message.
+### 3. TOON v3.0 Encoding
+The server implements a custom encoder for the **Token-Oriented Object Notation**.
+- **Tabular Mapping**: Collections of objects are converted into a header-prefixed format (e.g., `messages[50]{guid,text,...}:`).
+- **Context Optimization**: By removing redundant JSON keys, we achieve a ~50% reduction in token usage, allowing the AI to see more message history.
 
-### 1. Provider Orchestration
-The server uses a `FallbackProvider` to manage multiple messaging backends:
-- **Primary: Native IMCore (`NativeProvider`)**: Targeted at high-performance delivery using Apple's private frameworks. Currently a placeholder that returns a clear path for future implementation (requires SIP bypass).
-- **Secondary: Enhanced AppleScript (`AppleScriptProvider`)**: The robust default. It uses macOS's native IPC to control the Messages app.
-
-### 2. Resilience & Self-Healing
-The `AppleScriptProvider` is engineered for high reliability:
-- **Auto-Recovery**: Automatically detects if `Messages.app` is closed or unresponsive and re-launches it before retrying.
-- **Exponential Backoff**: Implements a 3-tier retry strategy with increasing delays (1s, 2s, 4s) to handle transient system busy states or database locks.
-- **Smart Filtering**: Fast-fails on non-transient errors (like missing permissions) to avoid unnecessary retries.
-
-### 3. Data Flow with Fallback
+## Data Flow
 ```mermaid
 graph TD
-    A[MCP send_message call] --> B{Fallback Manager}
-    B -->|Attempt 1| C[Native Provider]
-    C -->|Unavailable/Fail| D[AppleScript Provider]
-    D -->|Fail| E{Retry Logic}
-    E -->|Attempt 2| D
-    E -->|Attempt 3| D
-    D -->|Success| F[Final Result]
-    E -->|Exhausted| G[Detailed Error Report]
+    Client[MCP Client] <--> Transport[Stdio Transport]
+    Transport <--> Server[IMessageServer]
+    Server --> |Tool Call| Providers[FallbackProvider]
+    Providers --> |Primary| Native[NativeProvider]
+    Providers --> |Secondary| Apple[AppleScriptProvider]
+    Apple --> |IPC| Messages[Messages.app]
+    Server --> |Resource/Tool| DB[MessageDatabase]
+    DB --> |SQL| SQLite[(chat.db)]
+    DB --> |Paths| Files[Local FS / Attachments]
 ```

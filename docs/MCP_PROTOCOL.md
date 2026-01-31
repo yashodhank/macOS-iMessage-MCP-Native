@@ -4,27 +4,36 @@ The iMessages MCP Server implements the **Model Context Protocol (MCP)** to prov
 
 ## Server Capabilities
 
-The server is built using the `@modelcontextprotocol/sdk` and supports the following capabilities:
+The server advertises the following capabilities during the `initialize` handshake:
 
-- **Tools**: Executable functions that allow the LLM to perform actions (sending messages) or retrieve specific data (searching messages).
-- **Resources**: Dynamic data entities that the LLM can "read" to get a snapshot of state (e.g., the `imessage://recent` feed).
+- **Tools**: Dynamic functions with structured input schemas. 
+  - All tools use **Zod** for runtime validation, ensuring that malformed LLM requests are rejected before execution.
+- **Resources**: State-based data entities accessible via custom URIs.
+  - Resources support **TOON** content types for high-efficiency reading.
 
-## Transport Layer
+## Transport & Handshake
 
-The server uses **JSON-RPC 2.0** over **Standard Input/Output (stdio)**. This allows it to be easily integrated into local MCP clients like Claude Desktop, Cursor, or VS Code.
+The server utilizes the standard MCP **Stdio Transport**:
 
-## Tool Definitions
+1.  **Connection**: The client (e.g., Claude Desktop) spawns the server process and connects via standard pipes.
+2.  **Initialization**: 
+    - Client sends `initialize` request.
+    - Server responds with name (`imessage-mcp`), version, and capabilities.
+    - Handshake concludes with `initialized` notification.
+3.  **Tool Discovery**: Client calls `list_tools` to discover available functions and their JSON schemas.
 
-Every tool is defined with a **Zod-validated input schema**. This ensures that the LLM provides the correct arguments (e.g., valid strings for phone numbers) before any logic is executed.
+## Custom Resource URIs
 
-## Resource URIs
+Resources are addressed using the `imessage://` scheme:
+- `imessage://recent`: A dynamic stream of the 50 most recent messages, returned in `text/toon` format.
 
-The server exposes resources using custom URI schemes:
-- `imessage://recent`: Returns a TOON-formatted list of the 50 most recent messages.
+## Error Handling & Mapping
 
-## Error Handling
+The server provides granular error reporting by mapping native exceptions to MCP codes:
 
-The implementation maps native macOS errors (e.g., AppleScript timeouts or SQLite locks) to standard **MCP Error Codes**:
-- `InternalError`: For database access failures.
-- `InvalidParams`: For schema validation failures.
-- `MethodNotFound`: For unknown tool calls.
+| Native Source | MCP Error Code | Description |
+| :--- | :--- | :--- |
+| Zod Validation | `InvalidParams` (-32602) | Incorrect tool arguments provided by LLM. |
+| SQLite Lock | `InternalError` (-32603) | Database currently inaccessible (retry recommended). |
+| AppleScript TCC | `InternalError` (-32603) | Permissions missing for Messages.app automation. |
+| Unknown Tool | `MethodNotFound` (-32601) | LLM attempted to call a non-existent tool. |
