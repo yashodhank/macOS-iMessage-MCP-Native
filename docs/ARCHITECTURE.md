@@ -19,13 +19,30 @@ The server consists of several core layers:
 - **Normalization**: Automatically cleans and formats phone numbers and identifiers before processing, reducing delivery failures.
 - **Token Efficiency**: Custom TOON encoder serializes data into a tabular format, significantly reducing the token footprint for AI agents.
 
-## Data Flow
+## Messaging Architecture: The Provider Pattern
 
+To ensure reliability across different macOS security environments, the server implements a **Provider Pattern** for message delivery. This decouples the MCP tool logic from the specific implementation details of sending a message.
+
+### 1. Provider Orchestration
+The server uses a `FallbackProvider` to manage multiple messaging backends:
+- **Primary: Native IMCore (`NativeProvider`)**: Targeted at high-performance delivery using Apple's private frameworks. Currently a placeholder that returns a clear path for future implementation (requires SIP bypass).
+- **Secondary: Enhanced AppleScript (`AppleScriptProvider`)**: The robust default. It uses macOS's native IPC to control the Messages app.
+
+### 2. Resilience & Self-Healing
+The `AppleScriptProvider` is engineered for high reliability:
+- **Auto-Recovery**: Automatically detects if `Messages.app` is closed or unresponsive and re-launches it before retrying.
+- **Exponential Backoff**: Implements a 3-tier retry strategy with increasing delays (1s, 2s, 4s) to handle transient system busy states or database locks.
+- **Smart Filtering**: Fast-fails on non-transient errors (like missing permissions) to avoid unnecessary retries.
+
+### 3. Data Flow with Fallback
 ```mermaid
 graph TD
-    Client[MCP Client] <--> Server[MCP Server]
-    Server --> DB[(chat.db)]
-    Server --> AS[AppleScript]
-    AS --> Messages[Messages.app]
-    DB --> Attachments[Local File System]
+    A[MCP send_message call] --> B{Fallback Manager}
+    B -->|Attempt 1| C[Native Provider]
+    C -->|Unavailable/Fail| D[AppleScript Provider]
+    D -->|Fail| E{Retry Logic}
+    E -->|Attempt 2| D
+    E -->|Attempt 3| D
+    D -->|Success| F[Final Result]
+    E -->|Exhausted| G[Detailed Error Report]
 ```

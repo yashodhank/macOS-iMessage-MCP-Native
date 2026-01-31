@@ -10,15 +10,18 @@ import {
   ReadResourceRequestSchema,
 } from "@modelcontextprotocol/sdk/types.js";
 import { MessageDatabase } from "./db.js";
-import { AppleScriptService } from "./applescript.js";
 import { performHealthCheck } from "./permissions.js";
 import { z } from "zod";
 import * as toon from "./toon.js";
+import { MessagingProvider } from "./providers/types.js";
+import { AppleScriptProvider } from "./providers/applescript.js";
+import { NativeProvider } from "./providers/native.js";
+import { FallbackProvider } from "./providers/fallback.js";
 
 class IMessageServer {
   private server: Server;
   private db: MessageDatabase | null = null;
-  private appleScript: AppleScriptService;
+  private messagingProvider: MessagingProvider;
   private dbInitError: string | null = null;
 
   constructor() {
@@ -44,7 +47,11 @@ class IMessageServer {
       console.error("[Warning] Read operations will be unavailable. Run health_check for details.");
     }
     
-    this.appleScript = new AppleScriptService();
+    // Use FallbackProvider: Try Native (IMCore) first, then AppleScript
+    this.messagingProvider = new FallbackProvider([
+      new NativeProvider(),
+      new AppleScriptProvider(),
+    ]);
 
     this.setupResourceHandlers();
     this.setupToolHandlers();
@@ -220,7 +227,7 @@ class IMessageServer {
               })
               .parse(request.params.arguments);
 
-            const result = await this.appleScript.sendMessage(recipient, message);
+            const result = await this.messagingProvider.sendMessage({ recipient, message });
             
             if (result.success) {
               return {
