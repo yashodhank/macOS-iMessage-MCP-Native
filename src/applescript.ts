@@ -9,18 +9,36 @@ export interface SendMessageResult {
 
 export class AppleScriptService {
   /**
+   * Normalizes a recipient handle for AppleScript.
+   * Strips non-numeric characters for phone numbers but preserves email format.
+   */
+  private normalizeRecipient(recipient: string): string {
+    const trimmed = recipient.trim();
+    // If it's an email address, keep it as is
+    if (trimmed.includes('@')) {
+      return trimmed;
+    }
+    // If it's a phone number, keep only numbers and leading +
+    const isInternational = trimmed.startsWith('+');
+    const cleaned = trimmed.replace(/[^\d]/g, '');
+    return isInternational ? `+${cleaned}` : cleaned;
+  }
+
+  /**
    * Sends an iMessage to a recipient with improved error handling.
    * @param recipient The phone number or email address of the recipient.
    * @param message The message text to send.
    */
   async sendMessage(recipient: string, message: string): Promise<SendMessageResult> {
+    const normalizedRecipient = this.normalizeRecipient(recipient);
+    
     // Escape special characters for AppleScript
     const escapedMessage = message
       .replace(/\\/g, '\\\\')
       .replace(/"/g, '\\"')
       .replace(/\n/g, '\\n');
     
-    const escapedRecipient = recipient.replace(/"/g, '\\"');
+    const escapedRecipient = normalizedRecipient.replace(/"/g, '\\"');
     
     // More robust AppleScript with better error handling
     const script = `

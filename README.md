@@ -9,6 +9,16 @@ A Model Context Protocol (MCP) server for interacting with macOS iMessages. This
 - **Send Messages**: Send iMessages using AppleScript.
 - **Health Check**: Built-in diagnostics for permissions (Full Disk Access & Automation).
 - **Contact Integration**: Find chats by contact name or handle.
+- **TOON Format**: Upgraded output using Token-Oriented Object Notation for token efficiency.
+
+## TOON Format Output
+
+This server has been upgraded to use the **TOON (Token-Oriented Object Notation) v3.0** format for all tool outputs and resources. This format is designed for maximum token efficiency in Large Language Model (LLM) communications, reducing token overhead by up to 50% compared to standard JSON.
+
+- **Media Type**: `text/toon; charset=utf-8`
+- **Specification**: [TOON v3.0](https://toonformat.dev/reference/spec.html)
+
+All tabular data (messages, chats, contacts) is returned in TOON's efficient tabular format.
 
 ## Deployment Methods
 
@@ -65,6 +75,22 @@ The binary build uses `pkg` which may sometimes have issues with native modules 
 
 - `npm run dev`: Start with hot-reload using `tsx`.
 - `npm test`: Run unit tests with `vitest`.
+
+## Supporting the Project
+
+This bridge between your Mac and the AI world is built and maintained with passion. If this tool saves you hours of manual messaging or enables a breakthrough in your AI workflow, consider fueling its development. 
+
+Your support ensures we can keep up with macOS updates, maintain security patches, and continue adding high-value features like TOON optimization.
+
+- ☕ **One-time Support**: [Buy Me a Coffee](https://buymeacoffee.com/securiace)
+- 🚀 **Membership**: Join the circle of supporters for prioritized feature requests and direct implementation support.
+
+## Contributors
+
+We welcome contributions from the community! Whether it's a bug fix, a new feature, or improved documentation, your help is invaluable.
+
+- **Lead Developer**: [Securiace](https://github.com/securiace)
+- **Community**: Join us in the discussions and help shape the future of native iMessage MCP!
 
 ## License
 

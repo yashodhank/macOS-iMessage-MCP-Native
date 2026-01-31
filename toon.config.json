@@ -1,0 +1,13 @@
+{
+  "format": "TOON",
+  "specVersion": "3.0",
+  "encoder": {
+    "indentSize": 2,
+    "delimiter": ",",
+    "trailingNewline": false,
+    "keyFolding": "none"
+  },
+  "decoder": {
+    "strict": true
+  }
+}

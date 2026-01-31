@@ -6,11 +6,14 @@ import {
   ErrorCode,
   ListToolsRequestSchema,
   McpError,
+  ListResourcesRequestSchema,
+  ReadResourceRequestSchema,
 } from "@modelcontextprotocol/sdk/types.js";
 import { MessageDatabase } from "./db.js";
 import { AppleScriptService } from "./applescript.js";
-import { performHealthCheck, formatHealthCheckResult, checkFullDiskAccess } from "./permissions.js";
+import { performHealthCheck } from "./permissions.js";
 import { z } from "zod";
+import * as toon from "./toon.js";
 
 class IMessageServer {
   private server: Server;
@@ -27,6 +30,7 @@ class IMessageServer {
       {
         capabilities: {
           tools: {},
+          resources: {},
         },
       }
     );
@@ -42,6 +46,7 @@ class IMessageServer {
     
     this.appleScript = new AppleScriptService();
 
+    this.setupResourceHandlers();
     this.setupToolHandlers();
     
     // Error handling
@@ -49,6 +54,38 @@ class IMessageServer {
     process.on("SIGINT", async () => {
       await this.cleanup();
       process.exit(0);
+    });
+  }
+
+  private setupResourceHandlers() {
+    this.server.setRequestHandler(ListResourcesRequestSchema, async () => ({
+      resources: [
+        {
+          uri: "imessage://recent",
+          name: "Recent iMessages",
+          description: "A real-time view of the 50 most recent iMessages",
+          mimeType: "text/toon; charset=utf-8",
+        },
+      ],
+    }));
+
+    this.server.setRequestHandler(ReadResourceRequestSchema, async (request) => {
+      if (request.params.uri === "imessage://recent") {
+        if (!this.db) {
+          throw new McpError(ErrorCode.InternalError, "Database unavailable");
+        }
+        const messages = this.db.getRecentMessages(50);
+        return {
+          contents: [
+            {
+              uri: request.params.uri,
+              mimeType: "text/toon; charset=utf-8",
+              text: toon.stringify(messages, { arrayKey: 'messages' }),
+            },
+          ],
+        };
+      }
+      throw new McpError(ErrorCode.InvalidParams, `Unknown resource: ${request.params.uri}`);
     });
   }
 
@@ -134,6 +171,34 @@ class IMessageServer {
           },
         },
         {
+          name: "search_contacts",
+          description: "Search for contacts by phone number or email",
+          inputSchema: {
+            type: "object",
+            properties: {
+              query: {
+                type: "string",
+                description: "Partial phone number or email to search for",
+              },
+            },
+            required: ["query"],
+          },
+        },
+        {
+          name: "get_attachment_path",
+          description: "Get the local file path for an attachment by its GUID",
+          inputSchema: {
+            type: "object",
+            properties: {
+              guid: {
+                type: "string",
+                description: "The GUID of the attachment",
+              },
+            },
+            required: ["guid"],
+          },
+        },
+        {
           name: "health_check",
           description: "Check the health status of the MCP server including permissions and system requirements",
           inputSchema: {
@@ -171,12 +236,12 @@ class IMessageServer {
                 content: [
                   {
                     type: "text",
-                    text: JSON.stringify({
+                    text: toon.stringify({
                       success: false,
                       error: result.error,
                       errorCode: result.errorCode,
                       recommendation: result.recommendation,
-                    }, null, 2),
+                    }),
                   },
                 ],
                 isError: true,
@@ -199,7 +264,7 @@ class IMessageServer {
               content: [
                 {
                   type: "text",
-                  text: JSON.stringify(messages, null, 2),
+                  text: toon.stringify(messages, { arrayKey: 'messages' }),
                 },
               ],
             };
@@ -221,7 +286,7 @@ class IMessageServer {
               content: [
                 {
                   type: "text",
-                  text: JSON.stringify(messages, null, 2),
+                  text: toon.stringify(messages, { arrayKey: 'messages' }),
                 },
               ],
             };
@@ -243,7 +308,7 @@ class IMessageServer {
               content: [
                 {
                   type: "text",
-                  text: JSON.stringify(messages, null, 2),
+                  text: toon.stringify(messages, { arrayKey: 'messages' }),
                 },
               ],
             };
@@ -258,7 +323,60 @@ class IMessageServer {
               content: [
                 {
                   type: "text",
-                  text: JSON.stringify(chats, null, 2),
+                  text: toon.stringify(chats, { arrayKey: 'chats' }),
+                },
+              ],
+            };
+          }
+
+          case "search_contacts": {
+            if (!this.db) {
+              return this.dbUnavailableResponse();
+            }
+            const { query } = z
+              .object({
+                query: z.string(),
+              })
+              .parse(request.params.arguments);
+
+            const contacts = this.db.searchContacts(query);
+            return {
+              content: [
+                {
+                  type: "text",
+                  text: toon.stringify(contacts, { arrayKey: 'contacts' }),
+                },
+              ],
+            };
+          }
+
+          case "get_attachment_path": {
+            if (!this.db) {
+              return this.dbUnavailableResponse();
+            }
+            const { guid } = z
+              .object({
+                guid: z.string(),
+              })
+              .parse(request.params.arguments);
+
+            const path = this.db.getAttachmentPath(guid);
+            if (!path) {
+              return {
+                content: [
+                  {
+                    type: "text",
+                    text: `Attachment with GUID ${guid} not found.`,
+                  },
+                ],
+                isError: true,
+              };
+            }
+            return {
+              content: [
+                {
+                  type: "text",
+                  text: path,
                 },
               ],
             };
@@ -270,7 +388,7 @@ class IMessageServer {
               content: [
                 {
                   type: "text",
-                  text: formatHealthCheckResult(healthResult),
+                  text: toon.stringify(healthResult),
                 },
               ],
             };
@@ -299,11 +417,11 @@ class IMessageServer {
       content: [
         {
           type: "text" as const,
-          text: JSON.stringify({
+          text: toon.stringify({
             error: "Database unavailable",
             reason: this.dbInitError || "Full Disk Access permission required",
             recommendation: "Run the health_check tool to diagnose and fix permission issues.",
-          }, null, 2),
+          }),
         },
       ],
       isError: true,
