@@ -1,14 +1,41 @@
-import { runAppleScript } from 'run-applescript';
 import { MessagingProvider, SendMessageOptions, SendMessageResult } from './types.js';
+
+// run-applescript is a pure-ESM package.  Claude Desktop launches the server
+// with a CommonJS Node runtime, so a static `require()` (emitted by tsc for
+// ESM imports) would throw ERR_REQUIRE_ESM at startup.  Dynamic import() is
+// supported in both CJS and ESM runtimes and defers the load to call time.
+async function runAppleScript(script: string): Promise<string> {
+  const mod = await import('run-applescript');
+  const fn = mod.runAppleScript ?? (mod as any).default?.runAppleScript;
+  if (typeof fn !== 'function') throw new Error('run-applescript: runAppleScript not found');
+  return fn(script);
+}
 
 export class AppleScriptProvider implements MessagingProvider {
   public name = 'applescript';
 
+  /**
+   * Normalise a recipient string for use in Messages.app AppleScript.
+   *
+   * BUG FIX: previous version stripped ALL non-digit characters, which turned
+   * alphanumeric shortcodes (e.g. 'AXISBK-S(smsft_fi)') into empty strings.
+   *
+   * Rules:
+   *  - Email addresses (@) -> returned as-is
+   *  - Alphanumeric sender IDs (contains letters) -> returned as-is
+   *    (bank shortcodes like AXISBK, HDFCBK are read-only; cannot send to them)
+   *  - Pure digit / E.164 strings -> strip formatting chars, preserve leading '+'
+   */
   private normalizeRecipient(recipient: string): string {
     const trimmed = recipient.trim();
     if (trimmed.includes('@')) {
+      return trimmed; // email
+    }
+    // Alphanumeric sender ID (bank shortcode etc.) - preserve as-is
+    if (/[a-zA-Z]/.test(trimmed)) {
       return trimmed;
     }
+    // Phone number: strip non-digit chars, preserve E.164 '+' prefix
     const isInternational = trimmed.startsWith('+');
     const cleaned = trimmed.replace(/[^\d]/g, '');
     return isInternational ? `+${cleaned}` : cleaned;
@@ -25,30 +52,26 @@ export class AppleScriptProvider implements MessagingProvider {
 
   async sendMessage(options: SendMessageOptions): Promise<SendMessageResult> {
     const { recipient, message } = options;
-    
-    // Retry logic with exponential backoff
+
     let lastResult: SendMessageResult = { success: false, error: 'Initial state' };
-    const maxRetries = 2; // Total 3 attempts
-    
+    const maxRetries = 2;
+
     for (let attempt = 0; attempt <= maxRetries; attempt++) {
       if (attempt > 0) {
         const delay = Math.pow(2, attempt) * 1000;
         console.error(`[applescript] Retrying in ${delay}ms (attempt ${attempt + 1})...`);
         await new Promise(resolve => setTimeout(resolve, delay));
-        
-        // Ensure Messages is running before retry
         await this.ensureMessagesRunning();
       }
-      
+
       lastResult = await this.executeSend(recipient, message);
       if (lastResult.success) return lastResult;
-      
-      // If permission error, don't bother retrying
+
       if (lastResult.error?.includes('-1743') || lastResult.recommendation?.includes('Automation')) {
         return lastResult;
       }
     }
-    
+
     return lastResult;
   }
 
@@ -72,14 +95,14 @@ export class AppleScriptProvider implements MessagingProvider {
 
   private async executeSend(recipient: string, message: string): Promise<SendMessageResult> {
     const normalizedRecipient = this.normalizeRecipient(recipient);
-    
+
     const escapedMessage = message
       .replace(/\\/g, '\\\\')
       .replace(/"/g, '\\"')
       .replace(/\n/g, '\\n');
-    
+
     const escapedRecipient = normalizedRecipient.replace(/"/g, '\\"');
-    
+
     const script = `
       tell application "Messages"
         try
@@ -101,16 +124,15 @@ export class AppleScriptProvider implements MessagingProvider {
 
     try {
       const result = await runAppleScript(script);
-      
+
       if (result === 'success') {
         return { success: true };
       }
-      
+
       if (result.startsWith('error:')) {
         const parts = result.split(':');
         const errorCode = parts[1] || 'unknown';
         const errorMsg = parts.slice(2).join(':') || 'Unknown error';
-        
         return {
           success: false,
           error: `AppleScript error ${errorCode}: ${errorMsg}`,
@@ -118,7 +140,7 @@ export class AppleScriptProvider implements MessagingProvider {
           recommendation: this.getRecommendation(errorCode, errorMsg),
         };
       }
-      
+
       return { success: true };
     } catch (error: any) {
       const errorMsg = error.message || String(error);
@@ -142,14 +164,14 @@ export class AppleScriptProvider implements MessagingProvider {
       case -1728:
         return 'The recipient was not found. Ensure the phone number includes country code (e.g., +1) or use an email address.';
       case -1743:
-        return 'Automation permission denied. Go to System Settings → Privacy & Security → Automation and enable Messages for your terminal.';
+        return 'Automation permission denied. Go to System Settings > Privacy & Security > Automation and enable Messages for your terminal.';
       case -1708:
         return 'Messages.app does not understand this command. Try restarting Messages.app.';
       case -600:
         return 'Application is not running. Messages.app will be launched automatically on next attempt.';
       default:
         if (errorMsg.toLowerCase().includes('not authorized')) {
-          return 'Permission denied. Grant Automation access in System Settings → Privacy & Security → Automation.';
+          return 'Permission denied. Grant Automation access in System Settings > Privacy & Security > Automation.';
         }
         return 'Check that Messages.app is signed in and the recipient is valid.';
     }
@@ -157,7 +179,7 @@ export class AppleScriptProvider implements MessagingProvider {
 
   private getRecommendationFromError(errorMsg: string): string {
     if (errorMsg.includes('-1743') || errorMsg.toLowerCase().includes('not authorized')) {
-      return 'Automation permission denied. Go to System Settings → Privacy & Security → Automation and enable Messages.';
+      return 'Automation permission denied. Go to System Settings > Privacy & Security > Automation and enable Messages.';
     }
     if (errorMsg.includes('-1728')) {
       return 'Recipient not found. Use full phone number with country code or email address.';
